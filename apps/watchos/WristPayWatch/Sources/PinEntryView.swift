@@ -34,8 +34,12 @@ struct PinEntryView: View {
         showError = !ok
         pin = ""
         if ok {
+            // checkSilently's completion can run off the main actor (it's driven by
+            // WCSession's reply/error handlers) — session is @MainActor, so hop back before touching it.
             CompanionPresenceChecker.shared.checkSilently { level in
-                session.companionTrustLevel = level
+                Task { @MainActor in
+                    session.companionTrustLevel = level
+                }
             }
         }
     }
