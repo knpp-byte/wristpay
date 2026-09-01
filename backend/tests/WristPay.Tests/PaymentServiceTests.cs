@@ -108,6 +108,28 @@ public sealed class PaymentServiceTests
         Assert.All(results, r => Assert.Equal(results[0].Id, r.Id));
     }
 
+    [Fact]
+    public async Task SendAsync_provider_exception_marks_intent_failed_instead_of_leaving_it_pending()
+    {
+        var store = new InMemoryPaymentIntentStore();
+        var service = new PaymentService(
+            store, new MockRecipientResolver(), new ThrowingPaymentProvider(), new TransactionLimits());
+        var request = new SendPaymentRequest("key-throws", "9000000001", "9876543210", 500m);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SendAsync(request, CancellationToken.None));
+
+        // A retry with the same key must see a terminal result, not the stuck Pending intent —
+        // and it must not call the provider again.
+        var retry = await service.SendAsync(request, CancellationToken.None);
+        Assert.Equal(PaymentStatus.Failed, retry.Status);
+    }
+
+    private sealed class ThrowingPaymentProvider : IPaymentProvider
+    {
+        public Task<PaymentProviderResult> InitiateAsync(PaymentIntent intent, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Simulated PSP outage.");
+    }
+
     private sealed class CountingPaymentProvider : IPaymentProvider
     {
         private int _invocationCount;

@@ -44,34 +44,53 @@ public sealed class PaymentService
         if (!isNew)
             return intent; // Another call already owns this idempotency key — never process it twice.
 
-        if (_limits.ExceedsPerTransaction(request.AmountInr))
+        try
         {
-            intent.MarkLimitExceeded(
-                $"Amount exceeds the current per-transaction limit of ₹{_limits.PerTransactionInr}.");
+            if (_limits.ExceedsPerTransaction(request.AmountInr))
+            {
+                intent.MarkLimitExceeded(
+                    $"Amount exceeds the current per-transaction limit of ₹{_limits.PerTransactionInr}.");
+                await _store.SaveAsync(intent, cancellationToken);
+                return intent;
+            }
+
+            var recipient = await _recipientResolver.ResolveAsync(request.RecipientQuery, cancellationToken);
+            if (recipient is null)
+            {
+                intent.MarkRecipientNotFound();
+                await _store.SaveAsync(intent, cancellationToken);
+                return intent;
+            }
+
+            intent.AttachRecipient(recipient);
+            await _store.SaveAsync(intent, cancellationToken);
+
+            var result = await _paymentProvider.InitiateAsync(intent, cancellationToken);
+
+            if (result.Success)
+                intent.MarkSucceeded(result.ProviderReference ?? "unknown");
+            else
+                intent.MarkFailed(result.FailureReason ?? "Payment provider declined the transaction.");
+
             await _store.SaveAsync(intent, cancellationToken);
             return intent;
         }
-
-        var recipient = await _recipientResolver.ResolveAsync(request.RecipientQuery, cancellationToken);
-        if (recipient is null)
+        catch (Exception) when (intent.Status == PaymentStatus.Pending)
         {
-            intent.MarkRecipientNotFound();
-            await _store.SaveAsync(intent, cancellationToken);
-            return intent;
+            // An idempotency key is reserved the moment ReserveAsync returns IsNew: true — if the
+            // request is then cancelled, or the resolver/provider throws, the intent must still
+            // reach a terminal state. Otherwise it's stuck Pending forever and a retry with the
+            // same key returns that same stuck intent instead of ever progressing.
+            //
+            // Marking it Failed is a deliberate simplification for this mock/prototype stage: it
+            // never retries automatically, which is the safe choice (retrying an interrupted call
+            // whose real-world outcome is unknown risks a double payment). A production
+            // implementation should instead query the PSP for the transaction's actual status
+            // before deciding, rather than assuming failure.
+            intent.MarkFailed("Payment processing was interrupted before it could complete.");
+            await _store.SaveAsync(intent, CancellationToken.None);
+            throw;
         }
-
-        intent.AttachRecipient(recipient);
-        await _store.SaveAsync(intent, cancellationToken);
-
-        var result = await _paymentProvider.InitiateAsync(intent, cancellationToken);
-
-        if (result.Success)
-            intent.MarkSucceeded(result.ProviderReference ?? "unknown");
-        else
-            intent.MarkFailed(result.FailureReason ?? "Payment provider declined the transaction.");
-
-        await _store.SaveAsync(intent, cancellationToken);
-        return intent;
     }
 
     public Task<PaymentIntent?> GetAsync(Guid id, CancellationToken cancellationToken) =>

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using WristPay.Application;
 using WristPay.Domain;
 
@@ -7,36 +6,42 @@ namespace WristPay.Infrastructure;
 /// <summary>
 /// Process-memory implementation of <see cref="IPaymentIntentStore"/> — enough to prove the
 /// end-to-end flow and idempotency behavior locally. Replace with an EF Core + PostgreSQL-backed
-/// store before anything touches real transactions; state here is lost on restart and never shared
-/// across instances.
+/// store (unique constraint on idempotency key, atomic INSERT ... ON CONFLICT) before anything
+/// touches real transactions; state here is lost on restart and never shared across instances.
+///
+/// Uses a plain lock rather than lock-free ConcurrentDictionary tricks: this class exists to be
+/// obviously correct and short-lived, not to be a high-throughput production store.
 /// </summary>
 public sealed class InMemoryPaymentIntentStore : IPaymentIntentStore
 {
-    private readonly ConcurrentDictionary<Guid, PaymentIntent> _byId = new();
-    private readonly ConcurrentDictionary<string, Guid> _idByIdempotencyKey = new();
+    private readonly object _gate = new();
+    private readonly Dictionary<Guid, PaymentIntent> _byId = new();
+    private readonly Dictionary<string, Guid> _idByIdempotencyKey = new();
 
     public Task<(PaymentIntent Intent, bool IsNew)> ReserveAsync(
         string idempotencyKey, PaymentIntent candidate, CancellationToken cancellationToken)
     {
-        // Store the candidate under its own id first, so that whichever id "wins" the
-        // GetOrAdd below is already guaranteed to be present in _byId for every other thread
-        // that reads it — closing the reserve/lookup race a plain check-then-save has.
-        _byId[candidate.Id] = candidate;
+        lock (_gate)
+        {
+            if (_idByIdempotencyKey.TryGetValue(idempotencyKey, out var existingId))
+                return Task.FromResult((_byId[existingId], false));
 
-        var winningId = _idByIdempotencyKey.GetOrAdd(idempotencyKey, candidate.Id);
-        if (winningId == candidate.Id)
+            _byId[candidate.Id] = candidate;
+            _idByIdempotencyKey[idempotencyKey] = candidate.Id;
             return Task.FromResult((candidate, true));
-
-        return Task.FromResult((_byId[winningId], false));
+        }
     }
 
-    public Task<PaymentIntent?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        Task.FromResult(_byId.GetValueOrDefault(id));
+    public Task<PaymentIntent?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+            return Task.FromResult(_byId.GetValueOrDefault(id));
+    }
 
     public Task SaveAsync(PaymentIntent intent, CancellationToken cancellationToken)
     {
-        _byId[intent.Id] = intent;
-        _idByIdempotencyKey[intent.IdempotencyKey] = intent.Id;
+        lock (_gate)
+            _byId[intent.Id] = intent;
         return Task.CompletedTask;
     }
 }
