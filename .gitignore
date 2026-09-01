@@ -1,0 +1,35 @@
+# Xcode / Swift
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+*.xcworkspace/
+DerivedData/
+*.moved-aside
+*.xcuserstate
+xcuserdata/
+.build/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Node (tooling, if any)
+node_modules/
+
+# Env / secrets
+.env
+.env.*
+*.pfx
+*.p12
+
+# OS
+.DS_Store
+Thumbs.db
