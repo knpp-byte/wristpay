@@ -15,12 +15,19 @@ public sealed class InMemoryPaymentIntentStore : IPaymentIntentStore
     private readonly ConcurrentDictionary<Guid, PaymentIntent> _byId = new();
     private readonly ConcurrentDictionary<string, Guid> _idByIdempotencyKey = new();
 
-    public Task<PaymentIntent?> FindByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken)
+    public Task<(PaymentIntent Intent, bool IsNew)> ReserveAsync(
+        string idempotencyKey, PaymentIntent candidate, CancellationToken cancellationToken)
     {
-        if (_idByIdempotencyKey.TryGetValue(idempotencyKey, out var id) && _byId.TryGetValue(id, out var intent))
-            return Task.FromResult<PaymentIntent?>(intent);
+        // Store the candidate under its own id first, so that whichever id "wins" the
+        // GetOrAdd below is already guaranteed to be present in _byId for every other thread
+        // that reads it — closing the reserve/lookup race a plain check-then-save has.
+        _byId[candidate.Id] = candidate;
 
-        return Task.FromResult<PaymentIntent?>(null);
+        var winningId = _idByIdempotencyKey.GetOrAdd(idempotencyKey, candidate.Id);
+        if (winningId == candidate.Id)
+            return Task.FromResult((candidate, true));
+
+        return Task.FromResult((_byId[winningId], false));
     }
 
     public Task<PaymentIntent?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>

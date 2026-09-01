@@ -22,7 +22,9 @@ final class WristPayAPIClient {
     static let shared = WristPayAPIClient()
 
     // TODO: load from build configuration instead of hardcoding.
-    private let baseURL = URL(string: "http://localhost:5199")!
+    // Matches the "http" profile in backend/src/WristPay.Api/Properties/launchSettings.json —
+    // i.e. what `dotnet run --project src/WristPay.Api` binds to with no extra flags.
+    private let baseURL = URL(string: "http://localhost:5169")!
 
     func lookupRecipient(query: String) async throws -> Recipient {
         var components = URLComponents(url: baseURL.appendingPathComponent("api/recipients/lookup"),

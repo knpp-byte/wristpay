@@ -30,7 +30,7 @@ dotnet test
 ## Smoke-test the mock end-to-end payment flow
 
 ```bash
-curl -X POST http://localhost:5199/api/payments \
+curl -X POST http://localhost:5169/api/payments \
   -H "Content-Type: application/json" \
   -d '{"idempotencyKey":"demo-1","senderMobileNumber":"9000000001","recipientQuery":"9876543210","amountInr":500}'
 ```

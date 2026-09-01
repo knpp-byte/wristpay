@@ -34,15 +34,15 @@ public sealed class PaymentService
         if (request.AmountInr <= 0)
             throw new ArgumentException("Amount must be greater than zero.", nameof(request));
 
-        var existing = await _store.FindByIdempotencyKeyAsync(request.IdempotencyKey, cancellationToken);
-        if (existing is not null)
-            return existing;
-
-        var intent = new PaymentIntent(
+        var candidate = new PaymentIntent(
             request.IdempotencyKey,
             request.SenderMobileNumber,
             request.RecipientQuery,
             request.AmountInr);
+
+        var (intent, isNew) = await _store.ReserveAsync(request.IdempotencyKey, candidate, cancellationToken);
+        if (!isNew)
+            return intent; // Another call already owns this idempotency key — never process it twice.
 
         if (_limits.ExceedsPerTransaction(request.AmountInr))
         {

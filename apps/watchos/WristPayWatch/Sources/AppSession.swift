@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// Watch-side session state. The app PIN itself is created/reset only on the iPhone
