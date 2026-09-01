@@ -1,0 +1,24 @@
+# Local dev dependencies for when the backend moves off the in-memory store.
+# Docker isn't installed on the current dev machine — this file is ready for when it is,
+# or for whichever machine runs the ASP.NET Core backend next.
+#
+# Usage: docker compose -f infrastructure/docker-compose.yml up -d
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: wristpay
+      POSTGRES_USER: wristpay
+      POSTGRES_PASSWORD: wristpay_dev_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - wristpay_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  wristpay_postgres_data:

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WristPay.Api/WristPay.Api.csproj" />
+    <Project Path="src/WristPay.Application/WristPay.Application.csproj" />
+    <Project Path="src/WristPay.Domain/WristPay.Domain.csproj" />
+    <Project Path="src/WristPay.Infrastructure/WristPay.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WristPay.Tests/WristPay.Tests.csproj" />
+  </Folder>
+</Solution>

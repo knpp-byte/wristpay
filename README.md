@@ -5,8 +5,10 @@ using a contact, mobile number, or UPI ID — no pre-added beneficiary required.
 
 ## Status
 
-Early-stage prototype. See `docs/` for the full project plan (product, security model,
-regulatory path, and architecture decisions).
+Early-stage prototype. The backend (`backend/`) runs end-to-end today against mock UPI/PSP
+implementations — see `backend/README.md` to run it. `apps/ios` and `apps/watchos` contain the
+planned SwiftUI source, ready to drop into Xcode once a Mac is available. See `docs/` for the
+architecture and security model.
 
 ## Planned structure
 
