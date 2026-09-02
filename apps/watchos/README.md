@@ -23,3 +23,11 @@ Open app → 6-digit PIN → silent companion-iPhone trust check (if reachable)
 
 Do not add Face ID/Touch ID prompts here — this app intentionally uses PIN + silent companion-device
 presence instead, per the agreed security model in `/docs/security.md`.
+
+## App icon
+
+`Assets.xcassets/AppIcon.appiconset/` already has a source icon wired in (`AppIcon-1024.png`,
+1024×1024, full-bleed, no baked-in corner rounding or alpha channel). Drag `Assets.xcassets` into
+the new Xcode project and it should be picked up automatically via Xcode's modern single-size app
+icon format. Same source as the iPhone app's icon — see `/assets/app-icon-source.png` for the
+original if it ever needs reprocessing.
